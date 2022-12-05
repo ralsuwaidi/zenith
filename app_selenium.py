@@ -10,6 +10,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+import markdownify
 
 
 
@@ -29,7 +30,7 @@ def get_chatgpt(message):
     driver = webdriver.Firefox(options=options)
     driver.get("https://chat.openai.com")
     driver.find_element(By.XPATH, '//button[text()="Log in"]').click()
-    elem = WebDriverWait(driver, 10).until(
+    elem = WebDriverWait(driver, 30).until(
     EC.presence_of_element_located((By.ID, "username")) 
     )
 
@@ -41,7 +42,7 @@ def get_chatgpt(message):
     password.send_keys(env["OPENAI_PASSWORD"])
     driver.find_element(By.XPATH, '//button[text()="Continue"]').click()
 
-    WebDriverWait(driver, 10).until(
+    WebDriverWait(driver, 60).until(
     EC.presence_of_element_located((By.XPATH, '//button[text()="Next"]')) 
     )
 
@@ -52,15 +53,16 @@ def get_chatgpt(message):
     input_prompt.send_keys(message.text)
     input_prompt.send_keys(Keys.ENTER)
 
-    WebDriverWait(driver, 40).until(
+    WebDriverWait(driver, 90).until(
     EC.presence_of_element_located((By.XPATH, "//button[contains(text(), 'Try again')]")) 
     )
-    response=driver.find_element(By.XPATH, "//div[contains(@class, 'markdown prose')]/p")
-
+    response=driver.find_element(By.XPATH, "//div[contains(@class, 'markdown prose')]").get_attribute('innerHTML')
+    response = markdownify.markdownify(response, heading_style="ATX")
+    print(response)
 
     bot.send_message(message.chat.id,
-                     f'{response.text}',
-                     parse_mode="Markdown")
+                     f'{response}',
+                     parse_mode="markdown")
     driver.close()
 
-bot.infinity_polling(timeout=60, long_polling_timeout=90)
+bot.infinity_polling(timeout=120, long_polling_timeout=240)
