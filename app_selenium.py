@@ -1,21 +1,23 @@
 import logging
-import time
 from os import environ as env
-
+import time
 import openai
 import telebot
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.firefox.options import Options
+from selenium.webdriver import ActionChains
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 import markdownify
+import undetected_chromedriver as uc
+from fake_useragent import UserAgent
+ua = UserAgent()
 
-
-
-options = Options()
-options.headless = True
+options = webdriver.ChromeOptions()
+options.headless = False
+user_agent = ua.random
+options.add_argument(f'user-agent={user_agent}')
 
 
 logger = telebot.logger
@@ -27,8 +29,12 @@ openai.api_key = env["OPENAI_API_KEY"]
 
 @bot.message_handler(func=lambda message: True)
 def get_chatgpt(message):
-    driver = webdriver.Firefox(options=options)
+    driver = uc.Chrome(options=options)
     driver.get("https://chat.openai.com")
+    
+    elem = WebDriverWait(driver, 30).until(
+    EC.presence_of_element_located((By.XPATH, '//button[text()="Log in"]')) 
+    )
     driver.find_element(By.XPATH, '//button[text()="Log in"]').click()
     elem = WebDriverWait(driver, 30).until(
     EC.presence_of_element_located((By.ID, "username")) 
@@ -37,6 +43,31 @@ def get_chatgpt(message):
     driver.get(driver.current_url)
     username = driver.find_element(By.ID, "username")
     username.send_keys(env["OPENAI_USERNAME"])
+
+    # find iframe
+    captcha_iframe = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located(
+            (
+                By.TAG_NAME, 'iframe'
+            )
+        )
+    )
+
+    ActionChains(driver).move_to_element(captcha_iframe).click().perform()
+
+    # click im not robot
+    captcha_box = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located(
+            (
+                By.ID, 'g-recaptcha-response'
+            )
+        )
+    )
+
+    driver.execute_script("arguments[0].click()", captcha_box)
+
+    time.sleep(2)
+
     driver.find_element(By.XPATH, '//button[text()="Continue"]').click()
     password = driver.find_element(By.ID, "password")
     password.send_keys(env["OPENAI_PASSWORD"])
